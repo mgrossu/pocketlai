@@ -1,6 +1,6 @@
-# LocalChat: run LLMs on iPhone with MLX
+# PocketLLM: run LLMs on iPhone with MLX
 
-LocalChat is a SwiftUI chat app. It downloads open models from Hugging Face and runs them fully on-device on the
+PocketLLM is a SwiftUI chat app. It downloads open models from Hugging Face and runs them fully on-device on the
 iPhone GPU with [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm).
 The design follows Apple's [MLXChatExample](https://github.com/ml-explore/mlx-swift-examples/tree/main/Applications/MLXChatExample),
 which also handles both LLMs and vision models.
@@ -22,11 +22,11 @@ which also handles both LLMs and vision models.
 
 ## Build & run
 ```sh
-cd iphonellm
+cd pocketllm
 xcodegen generate
-open LocalChat.xcodeproj
+open PocketLLM.xcodeproj
 ```
-1. In Xcode, open target **LocalChat**, then **Signing & Capabilities**. Pick your Team and set a unique bundle ID.
+1. In Xcode, open target **PocketLLM**, then **Signing & Capabilities**. Pick your Team and set a unique bundle ID.
    You can also set `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`.
 2. On the first build, Xcode asks you to **Trust & Enable** the `MLXHuggingFaceMacros` macro plugin. Accept it.
 3. Select your iPhone and press ⌘R. On a first run, also enable Developer Mode on the phone.
@@ -43,14 +43,14 @@ The iPhone 17 Pro has 12 GB of RAM. Size estimates assume 4-bit weights:
 ## Project layout
 | File | Purpose |
 |---|---|
-| `LocalChat/ModelCatalog.swift` | Built-in model list. Add entries here. |
-| `LocalChat/ChatModel.swift` | Model loading (`loadModelContainer`), chat session, streaming, custom repos |
-| `LocalChat/ChatView.swift` | Model picker, chat UI, settings, `<think>` rendering |
+| `PocketLLM/ModelCatalog.swift` | Built-in model list. Add entries here. |
+| `PocketLLM/ChatModel.swift` | Model loading (`loadModelContainer`), chat session, streaming, custom repos |
+| `PocketLLM/ChatView.swift` | Model picker, chat UI, settings, `<think>` rendering |
 | `project.yml` | XcodeGen spec: packages, entitlements, Info.plist keys |
 
 ## Notes
 - **Free Apple ID:** if signing rejects `com.apple.developer.kernel.increased-memory-limit`, remove it from
-  `project.yml` and `LocalChat/LocalChat.entitlements`. Then stay at 4B or smaller.
+  `project.yml` and `PocketLLM/PocketLLM.entitlements`. Then stay at 4B or smaller.
 - **Speed:** Release builds are much faster than Debug builds. Use Edit Scheme → Run → Build Configuration → Release.
 - **Unsupported architectures:** a custom repo only loads if mlx-swift-lm supports its `model_type`.
   Otherwise the picker shows an "unsupported model type" error.

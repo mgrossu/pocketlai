@@ -1,6 +1,6 @@
-name: LocalChat
+name: PocketLLM
 options:
-  bundleIdPrefix: com.example
+  bundleIdPrefix: com.mgrossu
   deploymentTarget:
     iOS: "18.0"
   createIntermediateGroups: true
@@ -20,24 +20,24 @@ packages:
     from: 1.3.0
 
 targets:
-  LocalChat:
+  PocketLLM:
     type: application
     platform: iOS
-    sources: [LocalChat]
+    sources: [PocketLLM]
     entitlements:
-      path: LocalChat/LocalChat.entitlements
+      path: PocketLLM/PocketLLM.entitlements
       properties:
         # Lets the app use much more of the iPhone's RAM (needed for 4B+ models).
         com.apple.developer.kernel.increased-memory-limit: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.LocalChat   # change to something unique
-        DEVELOPMENT_TEAM: ""                              # set your Apple team ID, or pick it in Xcode
+        PRODUCT_BUNDLE_IDENTIFIER: com.mgrossu.PocketLLM
+        DEVELOPMENT_TEAM: ""   # set your Apple team ID, or pick it in Xcode
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Local Chat
+        INFOPLIST_KEY_CFBundleDisplayName: Pocket LLM
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
