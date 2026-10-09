@@ -112,8 +112,9 @@ final class ChatModel {
                 configuration: model.configuration,
                 progressHandler: { progress in
                     let fraction = progress.fractionCompleted
-                    Task { @MainActor [weak self] in
-                        guard let self, case .loading = self.loadState else { return }
+                    // ChatModel lives as long as the app, so a strong capture is fine here.
+                    Task { @MainActor in
+                        guard case .loading = self.loadState else { return }
                         self.loadState = .loading(fraction)
                     }
                 }

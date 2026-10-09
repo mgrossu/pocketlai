@@ -7,6 +7,7 @@ struct ChatView: View {
     @State private var showSettings = false
     @State private var photoItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
+    @State private var showImageHint = false
 
     var body: some View {
         NavigationStack {
@@ -30,6 +31,15 @@ struct ChatView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .presentationDetents([.medium, .large])
+            }
+            .alert("This model can't see images", isPresented: $showImageHint) {
+                Button("Switch model") {
+                    chat.stop()
+                    chat.loadState = .idle
+                }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("\(chat.selectedModel.name) is text-only. Pick a model marked 👁, such as Gemma 4 E2B, Qwen3-VL 4B or LFM2.5-VL 1.6B, to chat about photos.")
             }
             .onChange(of: photoItem) {
                 guard let photoItem else { return }
@@ -112,13 +122,22 @@ struct ChatView: View {
                 }
             }
             HStack(alignment: .bottom, spacing: 8) {
-                if chat.supportsImages {
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.title2)
+                Group {
+                    if chat.supportsImages {
+                        PhotosPicker(selection: $photoItem, matching: .images) {
+                            Image(systemName: "photo.badge.plus")
+                        }
+                    } else {
+                        // Text-only model: explain instead of silently hiding the button.
+                        Button("Attach photo", systemImage: "photo.badge.plus") {
+                            showImageHint = true
+                        }
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.secondary)
                     }
-                    .padding(.bottom, 4)
                 }
+                .font(.title2)
+                .padding(.bottom, 4)
 
                 TextField("Message", text: $input, axis: .vertical)
                     .lineLimit(1...5)
