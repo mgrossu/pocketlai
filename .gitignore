@@ -1,5 +1,6 @@
-*.xcodeproj/
+# Xcode per-user state (the project itself IS committed)
 xcuserdata/
+*.xcuserstate
 DerivedData/
 .build/
 .DS_Store

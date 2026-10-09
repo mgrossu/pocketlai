@@ -16,23 +16,27 @@ which also handles both LLMs and vision models.
 - **Custom system prompt.**
 
 ## Requirements
-- A Mac with Xcode 26 or newer (iOS 18+ SDK).
+- A Mac with Xcode 26 or newer (mlx-swift-lm needs Swift 6.2). No Homebrew or other tools are needed.
 - A physical iPhone. **MLX does not run in the iOS Simulator.**
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 
 ## Build & run
 ```sh
-cd pocketllm
-xcodegen generate
-open PocketLLM.xcodeproj
+git clone git@github.com:mgrossu/pocketllm.git
+open pocketllm/PocketLLM.xcodeproj
 ```
-1. In Xcode, open target **PocketLLM**, then **Signing & Capabilities**. Pick your Team and set a unique bundle ID.
-   You can also set `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`.
-2. On the first build, Xcode asks you to **Trust & Enable** the `MLXHuggingFaceMacros` macro plugin. Accept it.
-3. Select your iPhone and press ⌘R. On a first run, also enable Developer Mode on the phone.
-4. Pick a model, then tap **Load**. The first load downloads the weights; after that the model works offline.
+1. Xcode fetches the Swift packages automatically. The first time takes a few minutes.
+2. In the **PocketLLM** target, open **Signing & Capabilities** and pick your Team.
+3. On the first build, Xcode asks you to **Trust & Enable** the `MLXHuggingFaceMacros` macro plugin. Accept it.
+4. Plug in the iPhone, select it as the run destination, and press ⌘R.
+   - On a first run, enable Developer Mode on the phone (Settings → Privacy & Security).
+   - Then trust your developer certificate (Settings → General → VPN & Device Management).
+5. Pick a model, then tap **Load**. The first load downloads the weights; after that the model works offline.
 
-From the command line, use `xcodebuild ... -skipMacroValidation`.
+After that, the update loop is just `git pull`, then ⌘R. The project uses Xcode's synchronized folders,
+so new files in `PocketLLM/` show up in Xcode automatically.
+
+The shared scheme runs the **Release** configuration, because MLX is many times faster with optimizations on.
+For breakpoints and step-through debugging, switch Run to Debug: Product → Scheme → Edit Scheme.
 
 ## Which models fit?
 The iPhone 17 Pro has 12 GB of RAM. Size estimates assume 4-bit weights:
@@ -46,11 +50,10 @@ The iPhone 17 Pro has 12 GB of RAM. Size estimates assume 4-bit weights:
 | `PocketLLM/ModelCatalog.swift` | Built-in model list. Add entries here. |
 | `PocketLLM/ChatModel.swift` | Model loading (`loadModelContainer`), chat session, streaming, custom repos |
 | `PocketLLM/ChatView.swift` | Model picker, chat UI, settings, `<think>` rendering |
-| `project.yml` | XcodeGen spec: packages, entitlements, Info.plist keys |
+| `PocketLLM.xcodeproj` | Xcode project: packages, build settings, entitlements, Info.plist keys |
 
 ## Notes
 - **Free Apple ID:** if signing rejects `com.apple.developer.kernel.increased-memory-limit`, remove it from
-  `project.yml` and `PocketLLM/PocketLLM.entitlements`. Then stay at 4B or smaller.
-- **Speed:** Release builds are much faster than Debug builds. Use Edit Scheme → Run → Build Configuration → Release.
+  `PocketLLM/PocketLLM.entitlements`. Then stay at 4B or smaller.
 - **Unsupported architectures:** a custom repo only loads if mlx-swift-lm supports its `model_type`.
   Otherwise the picker shows an "unsupported model type" error.
