@@ -14,6 +14,7 @@
 		A1000000000000000000B005 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D005 /* MLX */; };
 		A1000000000000000000B006 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D006 /* HuggingFace */; };
 		A1000000000000000000B007 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D007 /* Tokenizers */; };
+		A1000000000000000000B008 /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D008 /* Textual */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 				A1000000000000000000B005 /* MLX in Frameworks */,
 				A1000000000000000000B006 /* HuggingFace in Frameworks */,
 				A1000000000000000000B007 /* Tokenizers in Frameworks */,
+				A1000000000000000000B008 /* Textual in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +91,7 @@
 				A1000000000000000000D005 /* MLX */,
 				A1000000000000000000D006 /* HuggingFace */,
 				A1000000000000000000D007 /* Tokenizers */,
+				A1000000000000000000D008 /* Textual */,
 			);
 			productName = PocketLAI;
 			productReference = A1000000000000000000F001 /* PocketLAI.app */;
@@ -123,6 +126,7 @@
 				A10000000000000000007002 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				A10000000000000000007003 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				A10000000000000000007004 /* XCRemoteSwiftPackageReference "swift-transformers" */,
+				A10000000000000000007005 /* XCRemoteSwiftPackageReference "textual" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1000000000000000000C002 /* Products */;
@@ -382,6 +386,14 @@
 			traits = (
 			);
 		};
+		A10000000000000000007005 /* XCRemoteSwiftPackageReference "textual" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/textual";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.5.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -419,6 +431,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000007004 /* XCRemoteSwiftPackageReference "swift-transformers" */;
 			productName = Tokenizers;
+		};
+		A1000000000000000000D008 /* Textual */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000007005 /* XCRemoteSwiftPackageReference "textual" */;
+			productName = Textual;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

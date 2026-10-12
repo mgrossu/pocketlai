@@ -323,13 +323,26 @@ struct MessageBubble: View {
                 if parts.answer.isEmpty && !parts.isThinking {
                     ProgressView()
                 } else if !parts.answer.isEmpty {
-                    Text(LocalizedStringKey(parts.answer))
-                        .textSelection(.enabled)
-                        .contextMenu { copyButton(parts.answer) }
+                    MarkdownView(markdown: parts.answer)
+                    if !isStreaming {
+                        Button {
+                            UIPasteboard.general.string = parts.answer
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// True while this is the reply currently being generated.
+    private var isStreaming: Bool {
+        chat.isGenerating && chat.messages.last?.id == message.id
     }
 
     private func copyButton(_ text: String) -> some View {

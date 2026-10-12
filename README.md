@@ -20,6 +20,7 @@ which also handles both LLMs and vision models.
 - **Photo input** for vision models (👁: Qwen3.5, Gemma 4, Ministral 3).
   On a text-only model, the photo button explains which models can see images.
 - **Text in, text out.** Vision models can *read* images, but no model here *generates* images.
+- **Rich replies.** Markdown (headings, lists, tables) and syntax-highlighted code blocks with a Copy button, rendered with [Textual](https://github.com/gonzalezreal/textual).
 - **Streaming replies** with a Stop button, plus tokens/sec, context size and free memory under the chat.
 - **Chat history.** Chats and their photos are saved on the phone. Reopening one restores its text as the model's context, even after switching models.
 - **Background downloads.** Models download in an iOS background session, so the download keeps going with the screen off or the app in the background, resumes instead of restarting, and sends a notification when it's done.
@@ -68,6 +69,7 @@ The iPhone 17 Pro has 12 GB of RAM. The picker shows each model's download size,
 | `PocketLAI/ModelDownloader.swift` | Background `URLSession` downloads from Hugging Face, resume, notification |
 | `PocketLAI/ModelStorage.swift` | Where models live on disk; download status, size and deletion |
 | `PocketLAI/ChatView.swift` | Chat screen, input bar, message bubbles, `<think>` rendering |
+| `PocketLAI/MarkdownView.swift` | Markdown rendering and the code block card (Textual) |
 | `PocketLAI/ModelsView.swift`, `HistoryView.swift`, `SettingsView.swift` | Models, Chats and Settings sheets |
 | `PocketLAI/Theme.swift` | Brand colors, background, appearance setting |
 | `PocketLAI/PocketLAI.icon` | App icon (Icon Composer). `docs/icon.svg` is a flat preview of it for this README. |
