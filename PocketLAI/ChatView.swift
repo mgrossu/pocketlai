@@ -39,7 +39,7 @@ struct ChatView: View {
                 }
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("\(chat.selectedModel.name) is text-only. Pick a model marked 👁, such as Gemma 4 E2B, Qwen3-VL 4B or LFM2.5-VL 1.6B, to chat about photos.")
+                Text("\(chat.selectedModel.name) is text-only. Pick a model marked 👁, such as Qwen3.5 2B, Gemma 4 E2B or LFM2.5-VL 1.6B, to chat about photos.")
             }
             .onChange(of: photoItem) {
                 guard let photoItem else { return }
@@ -191,7 +191,7 @@ struct ModelPickerView: View {
                         .frame(maxWidth: .infinity)
                 }
             } footer: {
-                Text("Models download once from Hugging Face, then run offline on the GPU with MLX. 👁 = understands images. Up to ~4B runs smoothly on iPhone 17 Pro.")
+                Text("Models download once from Hugging Face, then run offline on the GPU with MLX. 👁 = understands images. Sizes are downloads, roughly the RAM needed; up to ~3 GB runs smoothly on iPhone 17 Pro.")
             }
 
             ForEach(ModelCatalog.families, id: \.self) { family in
@@ -234,7 +234,7 @@ struct ModelPickerView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.name).foregroundStyle(.primary)
-                    Text(model.isCustom ? model.repoID : "\(model.size) · \(model.repoID)")
+                    Text(model.isCustom ? model.repoID : model.size)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

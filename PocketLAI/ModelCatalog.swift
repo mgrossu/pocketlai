@@ -11,7 +11,7 @@ import MLXVLM
 struct LMModel: Identifiable, Hashable {
     let name: String
     let family: String
-    /// Parameter count shown in the picker, e.g. "1.7B".
+    /// Parameters and download size shown in the picker, e.g. "4B · 3.0 GB".
     let size: String
     let configuration: ModelConfiguration
     let isCustom: Bool
@@ -45,39 +45,44 @@ struct LMModel: Identifiable, Hashable {
 }
 
 enum ModelCatalog {
-    /// Built-in models, all 4-bit quantized. On an iPhone 17 Pro (12 GB RAM),
-    /// models up to ~4B run smoothly. 7–8B models need the increased-memory entitlement.
+    /// Built-in models, all 4-bit. Sizes are the download size, which is roughly the RAM the model needs.
+    /// On an iPhone 17 Pro (12 GB RAM), up to ~3 GB runs smoothly. 5–6 GB models rely on
+    /// the increased-memory entitlement and leave little headroom.
+    /// 👁 = vision model: accepts photos (all Qwen3.5 models are multimodal).
     static let builtIn: [LMModel] = [
-        // Qwen
-        LMModel("Qwen3 0.6B", family: "Qwen", size: "0.6B", LLMRegistry.qwen3_0_6b_4bit),
-        LMModel("Qwen3 1.7B", family: "Qwen", size: "1.7B", LLMRegistry.qwen3_1_7b_4bit),
-        LMModel("Qwen3.5 2B", family: "Qwen", size: "2B", LLMRegistry.qwen3_5_2b_4bit),
-        LMModel("Qwen3 4B", family: "Qwen", size: "4B", LLMRegistry.qwen3_4b_4bit),
-        LMModel("Qwen3-VL 4B 👁", family: "Qwen", size: "4B", VLMRegistry.qwen3VL4BInstruct4Bit),
-        LMModel("Qwen3 8B", family: "Qwen", size: "8B", LLMRegistry.qwen3_8b_4bit),
+        // Qwen 3.5 (Mar 2026), natively multimodal, optional thinking
+        LMModel("Qwen3.5 0.8B 👁", family: "Qwen", size: "0.8B · 0.6 GB", hub("mlx-community/Qwen3.5-0.8B-4bit", eos: ["<|im_end|>"])),
+        LMModel("Qwen3.5 2B 👁", family: "Qwen", size: "2B · 1.7 GB", LLMRegistry.qwen3_5_2b_4bit),
+        LMModel("Qwen3.5 4B 👁", family: "Qwen", size: "4B · 3.0 GB", hub("mlx-community/Qwen3.5-4B-4bit", eos: ["<|im_end|>"])),
+        LMModel("Qwen3.5 9B 👁", family: "Qwen", size: "9B · 6.0 GB", hub("mlx-community/Qwen3.5-9B-4bit", eos: ["<|im_end|>"])),
 
-        // Gemma
-        LMModel("Gemma 3 1B", family: "Gemma", size: "1B", LLMRegistry.gemma3_1B_qat_4bit),
-        LMModel("Gemma 3 4B 👁", family: "Gemma", size: "4B", VLMRegistry.gemma3_4B_qat_4bit),
-        LMModel("Gemma 3n E2B", family: "Gemma", size: "E2B", LLMRegistry.gemma3n_E2B_it_lm_4bit),
-        LMModel("Gemma 3n E4B", family: "Gemma", size: "E4B", LLMRegistry.gemma3n_E4B_it_lm_4bit),
-        LMModel("Gemma 4 E2B 👁", family: "Gemma", size: "E2B", VLMRegistry.gemma4_E2B_it_4bit),
-        LMModel("Gemma 4 E4B 👁", family: "Gemma", size: "E4B", VLMRegistry.gemma4_E4B_it_4bit),
+        // Gemma 4 (Apr 2026), multimodal
+        LMModel("Gemma 4 E2B 👁", family: "Gemma", size: "E2B · 3.6 GB", VLMRegistry.gemma4_E2B_it_4bit),
+        LMModel("Gemma 4 E4B 👁", family: "Gemma", size: "E4B · 5.2 GB", VLMRegistry.gemma4_E4B_it_4bit),
 
-        // Llama
-        LMModel("Llama 3.2 1B", family: "Llama", size: "1B", LLMRegistry.llama3_2_1B_4bit),
-        LMModel("Llama 3.2 3B", family: "Llama", size: "3B", LLMRegistry.llama3_2_3B_4bit),
-        LMModel("Llama 3.1 8B", family: "Llama", size: "8B", LLMRegistry.llama3_1_8B_4bit),
+        // Liquid LFM2.5, built for on-device use
+        LMModel("LFM2.5 1.2B", family: "Liquid", size: "1.2B · 0.7 GB", hub("mlx-community/LFM2.5-1.2B-Instruct-4bit")),
+        LMModel("LFM2.5 1.2B Thinking", family: "Liquid", size: "1.2B · 0.7 GB", hub("mlx-community/LFM2.5-1.2B-Thinking-4bit")),
+        LMModel("LFM2.5-VL 1.6B 👁", family: "Liquid", size: "1.6B · 1.5 GB", VLMRegistry.lfm2_5_vl_1_6B_4bit),
+        LMModel("LFM2.5 2.6B", family: "Liquid", size: "2.6B · 1.5 GB", hub("mlx-community/LFM2.5-2.6B-4bit")),
+        LMModel("LFM2.5 8B-A1B (MoE)", family: "Liquid", size: "8B, 1B active · 4.8 GB", hub("mlx-community/LFM2.5-8B-A1B-MLX-4bit")),
+
+        // Mistral
+        LMModel("Ministral 3 3B 👁", family: "Mistral", size: "3B · 2.8 GB", VLMRegistry.mistral3_3B_Instruct_4bit),
+        LMModel("Ministral 3 8B 👁", family: "Mistral", size: "8B · 5.6 GB", hub("mlx-community/Ministral-3-8B-Instruct-2512-4bit")),
 
         // Others
-        LMModel("SmolLM3 3B", family: "Other", size: "3B", LLMRegistry.smollm3_3b_4bit),
-        LMModel("LFM2 1.2B", family: "Other", size: "1.2B", LLMRegistry.lfm2_1_2b_4bit),
-        LMModel("LFM2.5-VL 1.6B 👁", family: "Other", size: "1.6B", VLMRegistry.lfm2_5_vl_1_6B_4bit),
-        LMModel("Ministral 3 3B 👁", family: "Other", size: "3B", VLMRegistry.mistral3_3B_Instruct_4bit),
-        LMModel("Phi 3.5 mini", family: "Other", size: "3.8B", LLMRegistry.phi3_5_4bit),
-        LMModel("Granite 3.3 2B", family: "Other", size: "2B", LLMRegistry.granite3_3_2b_4bit),
-        LMModel("DeepSeek R1 Distill 7B", family: "Other", size: "7B", LLMRegistry.deepSeekR1_7B_4bit),
+        LMModel("Phi-4 mini", family: "Other", size: "3.8B · 2.2 GB", hub("mlx-community/Phi-4-mini-instruct-4bit", eos: ["<|end|>"])),
+        LMModel("Granite 4.1 3B", family: "Other", size: "3B · 2.1 GB", hub("mlx-community/granite-4.1-3b-4bit")),
+        LMModel("SmolLM3 3B", family: "Other", size: "3B · 1.7 GB", LLMRegistry.smollm3_3b_4bit),
+        LMModel("Llama 3.2 1B", family: "Other", size: "1B · 0.7 GB", LLMRegistry.llama3_2_1B_4bit),
+        LMModel("Llama 3.2 3B", family: "Other", size: "3B · 1.8 GB", LLMRegistry.llama3_2_3B_4bit),
     ]
 
-    static let families = ["Qwen", "Gemma", "Llama", "Other"]
+    static let families = ["Qwen", "Gemma", "Liquid", "Mistral", "Other"]
+
+    /// A Hugging Face repo that isn't in mlx-swift-lm's built-in registry.
+    private static func hub(_ id: String, eos: Set<String> = []) -> ModelConfiguration {
+        ModelConfiguration(id: id, extraEOSTokens: eos)
+    }
 }
