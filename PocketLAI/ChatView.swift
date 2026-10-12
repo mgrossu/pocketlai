@@ -17,7 +17,7 @@ struct ChatView: View {
                     inputBar
                 }
             }
-            .navigationTitle(chat.isLoaded ? chat.selectedModel.name : "Pocket LLM")
+            .navigationTitle(chat.isLoaded ? chat.selectedModel.name : "Pocket LAI")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

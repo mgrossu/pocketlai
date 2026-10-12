@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PocketLLMApp: App {
+struct PocketLAIApp: App {
     @State private var chat = ChatModel()
 
     var body: some Scene {

@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1000000000000000000A002"
-               BuildableName = "PocketLLM.app"
-               BlueprintName = "PocketLLM"
-               ReferencedContainer = "container:PocketLLM.xcodeproj">
+               BuildableName = "PocketLAI.app"
+               BlueprintName = "PocketLAI"
+               ReferencedContainer = "container:PocketLAI.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1000000000000000000A002"
-            BuildableName = "PocketLLM.app"
-            BlueprintName = "PocketLLM"
-            ReferencedContainer = "container:PocketLLM.xcodeproj">
+            BuildableName = "PocketLAI.app"
+            BlueprintName = "PocketLAI"
+            ReferencedContainer = "container:PocketLAI.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1000000000000000000A002"
-            BuildableName = "PocketLLM.app"
-            BlueprintName = "PocketLLM"
-            ReferencedContainer = "container:PocketLLM.xcodeproj">
+            BuildableName = "PocketLAI.app"
+            BlueprintName = "PocketLAI"
+            ReferencedContainer = "container:PocketLAI.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
