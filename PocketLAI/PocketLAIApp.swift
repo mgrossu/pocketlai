@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct PocketLAIApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var chat = ChatModel()
     @AppStorage("appearance") private var appearance: Appearance = .system
 

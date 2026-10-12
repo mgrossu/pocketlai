@@ -84,6 +84,8 @@ final class ChatModel {
             .map(LMModel.init(customRepoID:))
         conversations = store.loadAll()
         refreshDownloads()
+        // Hear back from downloads that kept running while the app was closed.
+        ModelDownloader.shared.reconnect()
     }
 
     var isLoaded: Bool { loadState == .ready && loadedModel != nil }
@@ -129,8 +131,11 @@ final class ChatModel {
     /// Deletes a model's files, unloading it first if it's the one in memory.
     func deleteDownload(of model: LMModel) {
         if loadedModel == model { unload() }
-        try? ModelStorage.delete(model.repoID)
-        refreshDownloads()
+        Task {
+            await ModelDownloader.shared.cancel(repoID: model.repoID)
+            try? ModelStorage.delete(model.repoID)
+            refreshDownloads()
+        }
     }
 
     // MARK: - Loading
@@ -149,20 +154,28 @@ final class ChatModel {
         loadState = .loading(0)
 
         do {
-            // Tries the vision-model factory, then the text-only one, so any
-            // supported architecture (Gemma, Llama, Qwen, Phi, Mistral…) loads.
-            let container = try await loadModelContainer(
-                from: #hubDownloader(),
-                using: #huggingFaceTokenizerLoader(),
-                configuration: model.configuration,
-                progressHandler: { progress in
-                    let fraction = progress.fractionCompleted
+            // Downloads in a background URLSession, so it continues with the screen off
+            // or the app in the background, and resumes instead of restarting.
+            let directory = try await ModelDownloader.shared.download(
+                repoID: model.repoID, name: model.name,
+                progress: { fraction in
                     // ChatModel lives as long as the app, so a strong capture is fine here.
                     Task { @MainActor in
                         guard case .loading = self.loadState else { return }
-                        self.loadState = .loading(fraction)
+                        self.loadState = .loading(min(fraction, 0.999))
                     }
                 }
+            )
+            loadState = .loading(1)
+
+            // Load from the local folder. Tries the vision-model factory, then the
+            // text-only one, so any supported architecture (Gemma, Llama, Qwen…) loads.
+            var configuration = model.configuration
+            configuration.id = .directory(directory)
+            let container = try await loadModelContainer(
+                from: #hubDownloader(),
+                using: #huggingFaceTokenizerLoader(),
+                configuration: configuration
             )
             guard selectedModel == model else {
                 loadState = .idle  // user picked another model meanwhile
@@ -172,6 +185,8 @@ final class ChatModel {
             self.loadedModel = model
             self.supportsImages = await container.perform { $0.model is any VLMModel }
             loadState = .ready
+        } catch is CancellationError {
+            if selectedModel == model { loadState = .idle }
         } catch {
             loadState = .failed(error.localizedDescription)
         }

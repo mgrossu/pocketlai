@@ -22,6 +22,7 @@ which also handles both LLMs and vision models.
 - **Text in, text out.** Vision models can *read* images, but no model here *generates* images.
 - **Streaming replies** with a Stop button, plus tokens/sec, context size and free memory under the chat.
 - **Chat history.** Chats and their photos are saved on the phone. Reopening one restores its text as the model's context, even after switching models.
+- **Background downloads.** Models download in an iOS background session, so the download keeps going with the screen off or the app in the background, resumes instead of restarting, and sends a notification when it's done.
 - **Model manager.** See which models are downloaded (and how big), what's loaded, and swipe to delete.
 - **Memory-safe photos.** Before each new photo, the context is rebuilt from text only, and messages are refused with a warning when free memory runs low (see Notes).
 - **Liquid Glass UI** with light, dark or system appearance.
@@ -64,7 +65,8 @@ The iPhone 17 Pro has 12 GB of RAM. The picker shows each model's download size,
 | `PocketLAI/ModelCatalog.swift` | Built-in model list. Add entries here. |
 | `PocketLAI/ChatModel.swift` | Model loading (`loadModelContainer`), chat session, streaming, memory guard |
 | `PocketLAI/Conversation.swift` | Chat and message types; saving chats and photos to disk |
-| `PocketLAI/ModelStorage.swift` | Finding and deleting downloaded models |
+| `PocketLAI/ModelDownloader.swift` | Background `URLSession` downloads from Hugging Face, resume, notification |
+| `PocketLAI/ModelStorage.swift` | Where models live on disk; download status, size and deletion |
 | `PocketLAI/ChatView.swift` | Chat screen, input bar, message bubbles, `<think>` rendering |
 | `PocketLAI/ModelsView.swift`, `HistoryView.swift`, `SettingsView.swift` | Models, Chats and Settings sheets |
 | `PocketLAI/Theme.swift` | Brand colors, background, appearance setting |
@@ -76,8 +78,8 @@ The iPhone 17 Pro has 12 GB of RAM. The picker shows each model's download size,
   `PocketLAI/PocketLAI.entitlements`. Then stay at 4B or smaller.
 - **Unsupported architectures:** a custom repo only loads if mlx-swift-lm supports its `model_type`.
   Otherwise the picker shows an "unsupported model type" error.
-- **Where data lives:** chats and photos are in `Application Support/Chats`. Models are in
-  `Library/Caches/huggingface/hub`; iOS can purge that folder when storage is low, and the model then simply downloads again.
+- **Where data lives:** chats and photos are in `Application Support/Chats`. Models are in `Application Support/Models`
+  (excluded from iCloud backup). Models downloaded by older versions in `Library/Caches/huggingface/hub` are still used.
 - **Why photos reset the context:** Gemma 4 and most vision models can't append a new photo to their cached context.
   The library would re-encode every photo in the chat at once, which crashed the app after about 3 photos.
   So before each new photo, the model's context is rebuilt from the chat's text only. Earlier photos stay visible,

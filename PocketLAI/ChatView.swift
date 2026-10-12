@@ -429,6 +429,11 @@ struct LoadingCard: View {
                     .monospacedDigit()
             }
             .font(.subheadline)
+            if fraction < 1 {
+                Label("You can lock your phone or leave the app. The download continues, and you'll get a notification when it's done.", systemImage: "moon.zzz")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(20)
         .glassEffect(.regular, in: .rect(cornerRadius: 24))
