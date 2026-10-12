@@ -7,6 +7,7 @@ struct ModelsView: View {
     @State private var customRepoID = ""
     @State private var pendingDelete: LMModel?
     @State private var confirmDeleteAll = false
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -28,10 +29,10 @@ struct ModelsView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .font(.callout.monospaced())
-                        Button("Add") {
-                            chat.addCustomModel(customRepoID)
-                            customRepoID = ""
-                        }
+                            .focused($fieldFocused)
+                            .submitLabel(.done)
+                            .onSubmit { addCustomModel() }
+                        Button("Add") { addCustomModel() }
                         .buttonStyle(.glass)
                         .disabled(!customRepoID.contains("/"))
                     }
@@ -53,11 +54,17 @@ struct ModelsView: View {
                     Text("Swipe a downloaded model to delete it. 👁 = understands photos. Sizes are about the memory a model needs; up to ~3 GB runs smoothly on iPhone 17 Pro.")
                 }
             }
+            // Scrolling hides the keyboard; it also gets a Done button.
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Models")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { fieldFocused = false }
                 }
             }
             .onAppear { chat.refreshDownloads() }
@@ -133,6 +140,12 @@ struct ModelsView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Not downloaded")
         }
+    }
+
+    private func addCustomModel() {
+        if customRepoID.contains("/") { chat.addCustomModel(customRepoID) }
+        customRepoID = ""
+        fieldFocused = false
     }
 
     private var totalDownloaded: String {

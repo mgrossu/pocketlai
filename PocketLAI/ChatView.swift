@@ -13,14 +13,14 @@ struct ChatView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var showImageHint = false
+    @FocusState private var inputFocused: Bool
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AppBackground()
-                content
-            }
-            .safeAreaInset(edge: .bottom) { bottomBar }
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background { AppBackground() }
+                .safeAreaInset(edge: .bottom) { bottomBar }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(item: $sheet) { sheet in
@@ -93,12 +93,25 @@ struct ChatView: View {
 
     @ViewBuilder
     private var content: some View {
+        Group {
+            mainContent
+        }
+        // Tapping outside the input field hides the keyboard.
+        .contentShape(.rect)
+        .onTapGesture { inputFocused = false }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
         if case .loading(let fraction) = chat.loadState {
             LoadingCard(modelName: chat.selectedModel.name, fraction: fraction)
         } else if !chat.messages.isEmpty {
             MessageList()
         } else if chat.isLoaded {
-            EmptyChatView { input = $0 }
+            EmptyChatView {
+                input = $0
+                inputFocused = true
+            }
         } else {
             WelcomeView(openModels: { sheet = .models })
         }
@@ -155,6 +168,7 @@ struct ChatView: View {
 
                     TextField("Ask anything", text: $input, axis: .vertical)
                         .lineLimit(1...6)
+                        .focused($inputFocused)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .glassEffect(.regular, in: .rect(cornerRadius: 22))
@@ -173,6 +187,7 @@ struct ChatView: View {
                             chat.send(input, image: attachedImage)
                             input = ""
                             attachedImage = nil
+                            inputFocused = false
                         } label: {
                             Image(systemName: "arrow.up")
                                 .font(.headline.weight(.bold))

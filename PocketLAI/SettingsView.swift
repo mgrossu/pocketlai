@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(ChatModel.self) private var chat
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appearance") private var appearance: Appearance = .system
+    @FocusState private var promptFocused: Bool
 
     var body: some View {
         @Bindable var chat = chat
@@ -27,6 +28,7 @@ struct SettingsView: View {
                 Section {
                     TextField("System prompt", text: $chat.systemPrompt, axis: .vertical)
                         .lineLimit(2...6)
+                        .focused($promptFocused)
                 } header: {
                     Text("System prompt")
                 } footer: {
@@ -43,11 +45,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            // Scrolling hides the keyboard; it also gets a Done button.
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { promptFocused = false }
                 }
             }
         }
