@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1000000000000000000A002"
-               BuildableName = "PocketLAI.app"
-               BlueprintName = "PocketLAI"
-               ReferencedContainer = "container:PocketLAI.xcodeproj">
+               BuildableName = "Pockli.app"
+               BlueprintName = "Pockli"
+               ReferencedContainer = "container:Pockli.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -39,15 +39,16 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
+      enableGPUValidationMode = "1"
       allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1000000000000000000A002"
-            BuildableName = "PocketLAI.app"
-            BlueprintName = "PocketLAI"
-            ReferencedContainer = "container:PocketLAI.xcodeproj">
+            BuildableName = "Pockli.app"
+            BlueprintName = "Pockli"
+            ReferencedContainer = "container:Pockli.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +63,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1000000000000000000A002"
-            BuildableName = "PocketLAI.app"
-            BlueprintName = "PocketLAI"
-            ReferencedContainer = "container:PocketLAI.xcodeproj">
+            BuildableName = "Pockli.app"
+            BlueprintName = "Pockli"
+            ReferencedContainer = "container:Pockli.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

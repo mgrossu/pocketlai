@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/icon.svg" width="160" alt="Pocket LAI app icon">
+  <img src="docs/icon.svg" width="160" alt="Pockli app icon">
 </p>
 
-<h1 align="center">Pocket LAI</h1>
+<h1 align="center">Pockli</h1>
 
 <p align="center"><b>Local AI in your pocket.</b> Chat with open LLMs entirely on your iPhone. No cloud, no account, works offline.</p>
 
-Pocket LAI (Local AI) is a SwiftUI chat app. It downloads open models from Hugging Face once, then runs them fully
+Pockli (Pocket Local Intelligence) is a SwiftUI chat app. It downloads open models from Hugging Face once, then runs them fully
 on-device on the iPhone GPU with Apple's [MLX](https://github.com/ml-explore/mlx-swift) framework via
 [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm).
 The design follows the MLX team's [MLXChatExample](https://github.com/ml-explore/mlx-swift-examples/tree/main/Applications/MLXChatExample),
@@ -37,11 +37,11 @@ which also handles both LLMs and vision models.
 
 ## Build & run
 ```sh
-git clone git@github.com:mgrossu/pocketlai.git
-open pocketlai/PocketLAI.xcodeproj
+git clone git@github.com:mgrossu/pockli.git
+open pockli/Pockli.xcodeproj
 ```
 1. Xcode fetches the Swift packages automatically. The first time takes a few minutes.
-2. In the **PocketLAI** target, open **Signing & Capabilities** and pick your Team.
+2. In the **Pockli** target, open **Signing & Capabilities** and pick your Team.
 3. On the first build, Xcode asks you to **Trust & Enable** the `MLXHuggingFaceMacros` macro plugin. Accept it.
 4. Plug in the iPhone, select it as the run destination, and press ⌘R.
    - On a first run, enable Developer Mode on the phone (Settings → Privacy & Security).
@@ -49,7 +49,7 @@ open pocketlai/PocketLAI.xcodeproj
 5. Pick a model, then tap **Load**. The first load downloads the weights; after that the model works offline.
 
 After that, the update loop is just `git pull`, then ⌘R. The project uses Xcode's synchronized folders,
-so new files in `PocketLAI/` show up in Xcode automatically.
+so new files in `Pockli/` show up in Xcode automatically.
 
 The shared scheme runs the **Release** configuration, because MLX is many times faster with optimizations on.
 For breakpoints and step-through debugging, switch Run to Debug: Product → Scheme → Edit Scheme.
@@ -63,21 +63,21 @@ The iPhone 17 Pro has 12 GB of RAM. The picker shows each model's download size,
 ## Project layout
 | File | Purpose |
 |---|---|
-| `PocketLAI/ModelCatalog.swift` | Built-in model list. Add entries here. |
-| `PocketLAI/ChatModel.swift` | Model loading (`loadModelContainer`), chat session, streaming, memory guard |
-| `PocketLAI/Conversation.swift` | Chat and message types; saving chats and photos to disk |
-| `PocketLAI/ModelDownloader.swift` | Background `URLSession` downloads from Hugging Face, resume, notification |
-| `PocketLAI/ModelStorage.swift` | Where models live on disk; download status, size and deletion |
-| `PocketLAI/ChatView.swift` | Chat screen, input bar, message bubbles, `<think>` rendering |
-| `PocketLAI/MarkdownView.swift` | Markdown rendering and the code block card (Textual) |
-| `PocketLAI/ModelsView.swift`, `HistoryView.swift`, `SettingsView.swift` | Models, Chats and Settings sheets |
-| `PocketLAI/Theme.swift` | Brand colors, background, appearance setting |
-| `PocketLAI/PocketLAI.icon` | App icon (Icon Composer). `docs/icon.svg` is a flat preview of it for this README. |
-| `PocketLAI.xcodeproj` | Xcode project: packages, build settings, entitlements, Info.plist keys |
+| `Pockli/ModelCatalog.swift` | Built-in model list. Add entries here. |
+| `Pockli/ChatModel.swift` | Model loading (`loadModelContainer`), chat session, streaming, memory guard |
+| `Pockli/Conversation.swift` | Chat and message types; saving chats and photos to disk |
+| `Pockli/ModelDownloader.swift` | Background `URLSession` downloads from Hugging Face, resume, notification |
+| `Pockli/ModelStorage.swift` | Where models live on disk; download status, size and deletion |
+| `Pockli/ChatView.swift` | Chat screen, input bar, message bubbles, `<think>` rendering |
+| `Pockli/MarkdownView.swift` | Markdown rendering and the code block card (Textual) |
+| `Pockli/ModelsView.swift`, `HistoryView.swift`, `SettingsView.swift` | Models, Chats and Settings sheets |
+| `Pockli/Theme.swift` | Brand colors and the appearance setting |
+| `Pockli/Pockli.icon` | App icon (Icon Composer). `docs/icon.svg` is a flat preview of it for this README. |
+| `Pockli.xcodeproj` | Xcode project: packages, build settings, entitlements, Info.plist keys |
 
 ## Notes
 - **Free Apple ID:** if signing rejects `com.apple.developer.kernel.increased-memory-limit`, remove it from
-  `PocketLAI/PocketLAI.entitlements`. Then stay at 4B or smaller.
+  `Pockli/Pockli.entitlements`. Then stay at 4B or smaller.
 - **Unsupported architectures:** a custom repo only loads if mlx-swift-lm supports its `model_type`.
   Otherwise the picker shows an "unsupported model type" error.
 - **Where data lives:** chats and photos are in `Application Support/Chats`. Models are in `Application Support/Models`

@@ -347,7 +347,7 @@ struct WelcomeView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.tint)
             VStack(spacing: 6) {
-                Text("Pocket LAI").font(.largeTitle.bold())
+                Text("Pockli").font(.largeTitle.bold())
                 Text("Private AI that runs entirely on your iPhone.")
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

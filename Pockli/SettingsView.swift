@@ -40,7 +40,7 @@ struct SettingsView: View {
                     LabeledContent(
                         "Free memory", value: chat.availableMemory.formatted(.byteCount(style: .memory)))
                     LabeledContent("Saved chats", value: "\(chat.conversations.count)")
-                    Text("Pocket LAI runs models on-device with MLX. Chats, photos and models never leave this iPhone.")
+                    Text("Pockli runs models on-device with MLX. Chats, photos and models never leave this iPhone.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

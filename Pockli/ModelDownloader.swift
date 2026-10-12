@@ -11,7 +11,7 @@ import UserNotifications
 /// ``AppDelegate`` hands us the completion handler.
 final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     static let shared = ModelDownloader()
-    static let sessionIdentifier = "com.mgrossu.PocketLAI.model-downloads"
+    static let sessionIdentifier = "com.mgrossu.Pockli.model-downloads"
 
     /// Set by ``AppDelegate`` when iOS wakes the app for finished background transfers.
     var backgroundCompletionHandler: (() -> Void)?
@@ -194,7 +194,7 @@ final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Se
             guard UIApplication.shared.applicationState != .active else { return }
             let content = UNMutableNotificationContent()
             content.title = "\(name) is ready"
-            content.body = "The download finished. Open Pocket LAI to start chatting."
+            content.body = "The download finished. Open Pockli to start chatting."
             content.sound = .default
             UNUserNotificationCenter.current().add(
                 UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
@@ -214,7 +214,7 @@ final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Se
         var errorDescription: String? {
             switch self {
             case .http(401, _), .http(403, _):
-                "This model requires a Hugging Face login, which Pocket LAI doesn't support."
+                "This model requires a Hugging Face login, which Pockli doesn't support."
             case .http(404, _):
                 "Model not found on Hugging Face. Check the repo ID."
             case .http(let code, let path):
