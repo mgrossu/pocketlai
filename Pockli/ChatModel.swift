@@ -316,12 +316,24 @@ final class ChatModel {
         persist()
 
         generationTask = Task {
+            // Tokens arrive 20–40 times a second. Re-rendering the Markdown that often
+            // makes the reply flicker, so hand them to the UI in batches (~10 per second).
+            var pending = ""
+            var lastFlush = ContinuousClock.now
+            func flush() {
+                guard !pending.isEmpty else { return }
+                append(pending, to: replyID)
+                pending = ""
+                lastFlush = .now
+            }
             do {
                 for try await item in activeSession.streamDetails(to: prompt, images: images) {
                     switch item {
                     case .chunk(let chunk):
-                        append(chunk, to: replyID)
+                        pending += chunk
+                        if ContinuousClock.now - lastFlush > .milliseconds(100) { flush() }
                     case .info(let info):
+                        flush()
                         contextTokens = info.promptTokenCount + info.generationTokenCount
                         let tps = Double(info.generationTokenCount) / max(info.generateTime, 0.001)
                         stats = String(format: "%.1f tok/s", tps)
@@ -332,14 +344,16 @@ final class ChatModel {
             } catch is CancellationError {
                 // stopped by the user
             } catch {
+                flush()
                 append("\n\n⚠️ \(error.localizedDescription)", to: replyID)
             }
-            // stop() already saved and reset state for a cancelled run; don't clobber a newer one.
+            flush()
+            // stop() already reset state for a cancelled run; don't clobber a newer one.
             if !Task.isCancelled {
                 isGenerating = false
                 generationTask = nil
-                persist()
             }
+            persist()  // also saves the last batch of a stopped reply
         }
     }
 

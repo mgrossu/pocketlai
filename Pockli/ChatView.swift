@@ -113,7 +113,8 @@ struct ChatView: View {
         if case .loading(let fraction) = chat.loadState {
             LoadingCard(modelName: chat.selectedModel.name, fraction: fraction)
         } else if !chat.messages.isEmpty {
-            MessageList()
+            // A fresh list per chat, so opening another chat starts at its end.
+            MessageList().id(chat.conversation.id)
         } else if chat.isLoaded {
             EmptyChatView {
                 input = $0
@@ -220,28 +221,85 @@ struct ChatView: View {
 
 // MARK: - Messages
 
+/// Chat transcript that scrolls like the Claude app: a new question moves to the top
+/// of the screen and the answer grows below it without the view jumping. You scroll
+/// freely; the ↓ button takes you back to the end.
 struct MessageList: View {
     @Environment(ChatModel.self) private var chat
+    @State private var position = ScrollPosition(idType: UUID.self)
+    @State private var viewportHeight: CGFloat = 0
+    @State private var isAtBottom = true
 
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(chat.messages) { message in
-                        MessageBubble(message: message)
-                            .id(message.id)
-                    }
-                    StatusLine()
-                    Color.clear.frame(height: 1).id("bottom")
-                }
-                .padding()
-            }
-            .defaultScrollAnchor(.bottom)
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: chat.messages.last?.text) {
-                proxy.scrollTo("bottom", anchor: .bottom)
+    /// A question and the reply to it. Identified by the question's message ID.
+    private struct Turn: Identifiable {
+        let id: UUID
+        var messages: [ChatMessage]
+    }
+
+    private var turns: [Turn] {
+        var turns: [Turn] = []
+        for message in chat.messages {
+            if message.role == .user || turns.isEmpty {
+                turns.append(Turn(id: message.id, messages: [message]))
+            } else {
+                turns[turns.count - 1].messages.append(message)
             }
         }
+        return turns
+    }
+
+    var body: some View {
+        let turns = turns
+        ScrollView {
+            // A plain VStack (not lazy): lazy stacks estimate the height of rows they
+            // haven't laid out yet, which makes long formatted replies jump while scrolling.
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(turns) { turn in
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(turn.messages) { MessageBubble(message: $0) }
+                        if turn.id == turns.last?.id { StatusLine() }
+                    }
+                    // The last turn is at least a screen tall, so the question can sit
+                    // at the top while the answer is still short.
+                    .frame(
+                        minHeight: turn.id == turns.last?.id ? max(viewportHeight - 32, 0) : nil,
+                        alignment: .top)
+                    .id(turn.id)
+                }
+            }
+            .scrollTargetLayout()
+            .padding()
+        }
+        .scrollPosition($position)
+        .defaultScrollAnchor(.bottom, for: .initialOffset)
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in
+            viewportHeight = height
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.containerSize.height
+                >= geometry.contentSize.height - 60
+        } action: { _, atBottom in
+            isAtBottom = atBottom
+        }
+        .onChange(of: chat.isGenerating) { _, generating in
+            // A new question was sent: bring it to the top of the screen.
+            guard generating, let last = self.turns.last else { return }
+            withAnimation(.smooth) { position.scrollTo(id: last.id, anchor: .top) }
+        }
+        .overlay(alignment: .bottom) {
+            if !isAtBottom {
+                Button("Scroll to bottom", systemImage: "arrow.down") {
+                    withAnimation(.smooth) { position.scrollTo(edge: .bottom) }
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .padding(.bottom, 8)
+                .transition(.opacity)
+            }
+        }
+        .animation(.default, value: isAtBottom)
     }
 }
 
