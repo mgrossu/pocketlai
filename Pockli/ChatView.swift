@@ -13,6 +13,7 @@ struct ChatView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var showImageHint = false
+    @AppStorage("appearance") private var appearance: Appearance = .system
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -27,11 +28,16 @@ struct ChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(item: $sheet) { sheet in
-                switch sheet {
-                case .models: ModelsView()
-                case .history: HistoryView()
-                case .settings: SettingsView().presentationDetents([.medium, .large])
+                Group {
+                    switch sheet {
+                    case .models: ModelsView()
+                    case .history: HistoryView()
+                    case .settings: SettingsView().presentationDetents([.medium, .large])
+                    }
                 }
+                // Sheets are separate presentations: apply the app's Light/Dark choice
+                // here too, or they can fall back to the phone's appearance.
+                .preferredColorScheme(appearance.colorScheme)
             }
             .alert("Low memory", isPresented: memoryWarningShown) {
                 Button("New chat") { chat.newChat() }
