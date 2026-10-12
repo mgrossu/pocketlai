@@ -320,7 +320,7 @@ final class ChatModel {
             // makes the reply flicker, so hand them to the UI in batches (~10 per second).
             var pending = ""
             var lastFlush = ContinuousClock.now
-            func flush() {
+            @MainActor func flush() {
                 guard !pending.isEmpty else { return }
                 append(pending, to: replyID)
                 pending = ""
