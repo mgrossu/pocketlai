@@ -54,17 +54,13 @@ struct ModelsView: View {
                     Text("Swipe a downloaded model to delete it. 👁 = understands photos. Sizes are about the memory a model needs; up to ~3 GB runs smoothly on iPhone 17 Pro.")
                 }
             }
-            // Scrolling hides the keyboard; it also gets a Done button.
+            // Scrolling hides the keyboard.
             .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Models")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { fieldFocused = false }
                 }
             }
             .onAppear { chat.refreshDownloads() }

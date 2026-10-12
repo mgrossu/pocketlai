@@ -166,6 +166,9 @@ final class ChatModel {
                     }
                 }
             )
+            // iOS forbids GPU work in the background. If the download finished while
+            // the app was in the background, wait until it's open again to load.
+            await waitUntilActive()
             loadState = .loading(1)
 
             // Load from the local folder. Tries the vision-model factory, then the
@@ -191,6 +194,20 @@ final class ChatModel {
             loadState = .failed(error.localizedDescription)
         }
         refreshDownloads()
+    }
+
+    /// Called when the app leaves the screen: iOS doesn't allow GPU work in the background.
+    func didEnterBackground() {
+        stop()
+    }
+
+    private func waitUntilActive() async {
+        guard UIApplication.shared.applicationState != .active else { return }
+        for await _ in NotificationCenter.default.notifications(
+            named: UIApplication.didBecomeActiveNotification)
+        {
+            break
+        }
     }
 
     func unload() {

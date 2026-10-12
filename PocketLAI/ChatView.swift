@@ -17,10 +17,14 @@ struct ChatView: View {
 
     var body: some View {
         NavigationStack {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background { AppBackground() }
-                .safeAreaInset(edge: .bottom) { bottomBar }
+            // The input bar is the last item of the stack (not an overlay), so the
+            // whole stack shrinks above the keyboard and the bar is never covered.
+            VStack(spacing: 0) {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                bottomBar
+            }
+            .background { AppBackground() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(item: $sheet) { sheet in

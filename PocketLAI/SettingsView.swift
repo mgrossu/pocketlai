@@ -45,17 +45,13 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            // Scrolling hides the keyboard; it also gets a Done button.
+            // Scrolling hides the keyboard.
             .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { promptFocused = false }
                 }
             }
         }
