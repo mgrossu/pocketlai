@@ -39,7 +39,7 @@ struct ChatView: View {
                 }
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("\(chat.selectedModel.name) is text-only. Pick a model marked 👁, such as Qwen3.5 2B, Gemma 4 E2B or LFM2.5-VL 1.6B, to chat about photos.")
+                Text("\(chat.selectedModel.name) is text-only. Pick a model marked 👁, such as Qwen3.5 2B, Gemma 4 E2B or Ministral 3 3B, to chat about photos.")
             }
             .onChange(of: photoItem) {
                 guard let photoItem else { return }

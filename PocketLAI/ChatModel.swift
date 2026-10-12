@@ -28,7 +28,7 @@ final class ChatModel {
         case failed(String)
     }
 
-    var selectedModel: LMModel = ModelCatalog.builtIn[1]
+    var selectedModel: LMModel = ModelCatalog.defaultModel
     var customModels: [LMModel] = []
     var loadState: LoadState = .idle
     var messages: [ChatMessage] = []
