@@ -2,44 +2,45 @@ import PhotosUI
 import SwiftUI
 
 struct ChatView: View {
+    enum Sheet: String, Identifiable {
+        case models, history, settings
+        var id: String { rawValue }
+    }
+
     @Environment(ChatModel.self) private var chat
     @State private var input = ""
-    @State private var showSettings = false
+    @State private var sheet: Sheet?
     @State private var photoItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var showImageHint = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack {
+                AppBackground()
                 content
-                if chat.isLoaded {
-                    inputBar
-                }
             }
-            .navigationTitle(chat.isLoaded ? chat.selectedModel.name : "Pocket LAI")
+            .safeAreaInset(edge: .bottom) { bottomBar }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("New", systemImage: "square.and.pencil") { chat.newSession() }
-                        .disabled(!chat.isLoaded)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "slider.horizontal.3") { showSettings = true }
+            .toolbar { toolbar }
+            .sheet(item: $sheet) { sheet in
+                switch sheet {
+                case .models: ModelsView()
+                case .history: HistoryView()
+                case .settings: SettingsView().presentationDetents([.medium, .large])
                 }
             }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-                    .presentationDetents([.medium, .large])
-            }
-            .alert("This model can't see images", isPresented: $showImageHint) {
-                Button("Switch model") {
-                    chat.stop()
-                    chat.loadState = .idle
-                }
+            .alert("Low memory", isPresented: memoryWarningShown) {
+                Button("New chat") { chat.newChat() }
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("\(chat.selectedModel.name) is text-only. Pick a model marked 👁, such as Qwen3.5 2B, Gemma 4 E2B or Ministral 3 3B, to chat about photos.")
+                Text(chat.memoryWarning ?? "")
+            }
+            .alert("This model can't see images", isPresented: $showImageHint) {
+                Button("Choose model") { sheet = .models }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("\(chat.loadedModel?.name ?? "This model") is text-only. Pick a model marked 👁, such as Qwen3.5 2B, Gemma 4 E2B or Ministral 3 3B, to chat about photos.")
             }
             .onChange(of: photoItem) {
                 guard let photoItem else { return }
@@ -53,316 +54,398 @@ struct ChatView: View {
         }
     }
 
-    @ViewBuilder
-    private var content: some View {
-        switch chat.loadState {
-        case .loading(let fraction):
-            VStack(spacing: 16) {
-                ProgressView(value: fraction) {
-                    Text(fraction < 1 ? "Downloading \(chat.selectedModel.name)…" : "Loading into memory…")
-                } currentValueLabel: {
-                    Text(fraction, format: .percent.precision(.fractionLength(0)))
+    private var memoryWarningShown: Binding<Bool> {
+        Binding(
+            get: { chat.memoryWarning != nil },
+            set: { if !$0 { chat.memoryWarning = nil } }
+        )
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button("Chats", systemImage: "clock.arrow.circlepath") { sheet = .history }
+        }
+        ToolbarItem(placement: .principal) {
+            Button { sheet = .models } label: {
+                HStack(spacing: 4) {
+                    Text(chat.loadedModel?.name ?? "Choose model")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 6)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .ready where chat.isLoaded:
-            messageList
-        default:
-            ModelPickerView()
+            .buttonStyle(.glass)
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button("New chat", systemImage: "square.and.pencil") { chat.newChat() }
+                .disabled(chat.messages.isEmpty)
+            Button("Settings", systemImage: "gearshape") { sheet = .settings }
         }
     }
 
-    private var messageList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if chat.messages.isEmpty {
-                        Text(chat.supportsImages
-                             ? "Running fully on-device. Ask anything, or attach a photo."
-                             : "Running fully on-device. Ask anything.")
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                    }
-                    ForEach(chat.messages) { message in
-                        MessageBubble(message: message)
-                            .id(message.id)
-                    }
-                    if !chat.stats.isEmpty {
-                        Text(chat.stats)
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    Color.clear.frame(height: 1).id("bottom")
-                }
-                .padding()
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: chat.messages.last?.text) {
-                proxy.scrollTo("bottom", anchor: .bottom)
-            }
+    // MARK: - Content
+
+    @ViewBuilder
+    private var content: some View {
+        if case .loading(let fraction) = chat.loadState {
+            LoadingCard(modelName: chat.selectedModel.name, fraction: fraction)
+        } else if !chat.messages.isEmpty {
+            MessageList()
+        } else if chat.isLoaded {
+            EmptyChatView { input = $0 }
+        } else {
+            WelcomeView(openModels: { sheet = .models })
         }
+    }
+
+    // MARK: - Bottom bar
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        if chat.isLoaded {
+            inputBar
+        } else if case .loading = chat.loadState {
+            EmptyView()
+        } else if !chat.messages.isEmpty {
+            // A saved chat is open but no model is in memory.
+            Button {
+                Task { await chat.load(chat.selectedModel) }
+            } label: {
+                Label("Load \(chat.selectedModel.name) to continue", systemImage: "bolt.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.glassProminent)
+            .padding()
+        }
+    }
+
+    private var canSend: Bool {
+        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var inputBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let attachedImage {
-                ZStack(alignment: .topTrailing) {
-                    Image(uiImage: attachedImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 64, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    Button("Remove", systemImage: "xmark.circle.fill") { self.attachedImage = nil }
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.white, .black.opacity(0.6))
-                        .offset(x: 6, y: -6)
+        GlassEffectContainer(spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
+                if let attachedImage {
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: attachedImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(.rect(cornerRadius: 14))
+                        Button("Remove", systemImage: "xmark") { self.attachedImage = nil }
+                            .labelStyle(.iconOnly)
+                            .font(.caption.weight(.bold))
+                            .frame(width: 24, height: 24)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                            .offset(x: 8, y: -8)
+                    }
+                    .padding(.leading, 54)
                 }
-            }
-            HStack(alignment: .bottom, spacing: 8) {
-                Group {
-                    if chat.supportsImages {
-                        PhotosPicker(selection: $photoItem, matching: .images) {
-                            Image(systemName: "photo.badge.plus")
+
+                HStack(alignment: .bottom, spacing: 10) {
+                    photoButton
+
+                    TextField("Ask anything", text: $input, axis: .vertical)
+                        .lineLimit(1...6)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+
+                    if chat.isGenerating {
+                        Button { chat.stop() } label: {
+                            Image(systemName: "stop.fill")
+                                .font(.headline)
+                                .frame(width: 44, height: 44)
                         }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                        .accessibilityLabel("Stop")
                     } else {
-                        // Text-only model: explain instead of silently hiding the button.
-                        Button("Attach photo", systemImage: "photo.badge.plus") {
-                            showImageHint = true
+                        Button {
+                            chat.send(input, image: attachedImage)
+                            input = ""
+                            attachedImage = nil
+                        } label: {
+                            Image(systemName: "arrow.up")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
                         }
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.tint(.brandPurple).interactive(), in: .circle)
+                        .disabled(!canSend)
+                        .opacity(canSend ? 1 : 0.5)
+                        .accessibilityLabel("Send")
                     }
-                }
-                .font(.title2)
-                .padding(.bottom, 4)
-
-                TextField("Message", text: $input, axis: .vertical)
-                    .lineLimit(1...5)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
-
-                if chat.isGenerating {
-                    Button("Stop", systemImage: "stop.circle.fill") { chat.stop() }
-                        .labelStyle(.iconOnly)
-                        .font(.title)
-                } else {
-                    Button("Send", systemImage: "arrow.up.circle.fill") {
-                        chat.send(input, image: attachedImage)
-                        input = ""
-                        attachedImage = nil
-                    }
-                    .labelStyle(.iconOnly)
-                    .font(.title)
-                    .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
         .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.bar)
-    }
-}
-
-// MARK: - Model picker
-
-struct ModelPickerView: View {
-    @Environment(ChatModel.self) private var chat
-    @State private var customRepoID = ""
-
-    var body: some View {
-        List {
-            if case .failed(let message) = chat.loadState {
-                Section {
-                    Label(message, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
-                }
-            }
-
-            Section {
-                Button {
-                    Task { await chat.load() }
-                } label: {
-                    Text("Load \(chat.selectedModel.name)")
-                        .bold()
-                        .frame(maxWidth: .infinity)
-                }
-            } footer: {
-                Text("Models download once from Hugging Face, then run offline on the GPU with MLX. 👁 = understands images. Sizes are downloads, roughly the RAM needed; up to ~3 GB runs smoothly on iPhone 17 Pro.")
-            }
-
-            ForEach(ModelCatalog.families, id: \.self) { family in
-                Section(family) {
-                    ForEach(ModelCatalog.builtIn.filter { $0.family == family }) { model in
-                        row(for: model)
-                    }
-                }
-            }
-
-            Section {
-                ForEach(chat.customModels) { model in
-                    row(for: model)
-                }
-                .onDelete { chat.removeCustomModels(at: $0) }
-
-                HStack {
-                    TextField("mlx-community/model-name", text: $customRepoID)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.callout.monospaced())
-                    Button("Add") {
-                        chat.addCustomModel(customRepoID)
-                        customRepoID = ""
-                    }
-                    .disabled(!customRepoID.contains("/"))
-                }
-            } header: {
-                Text("Any Hugging Face model")
-            } footer: {
-                Text("Paste the repo ID of any MLX model, e.g. from huggingface.co/mlx-community. Its architecture must be supported by mlx-swift-lm. Swipe to remove.")
-            }
-        }
+        .padding(.bottom, 8)
     }
 
-    private func row(for model: LMModel) -> some View {
-        Button {
-            chat.selectedModel = model
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.name).foregroundStyle(.primary)
-                    Text(model.isCustom ? model.repoID : model.size)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                if chat.selectedModel == model {
-                    Image(systemName: "checkmark").foregroundStyle(.tint)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Settings
-
-struct SettingsView: View {
-    @Environment(ChatModel.self) private var chat
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        @Bindable var chat = chat
-        NavigationStack {
-            Form {
-                Section("Model") {
-                    LabeledContent("Current", value: chat.isLoaded ? chat.selectedModel.name : "None")
-                    Button("Switch model…") {
-                        chat.stop()
-                        chat.loadState = .idle
-                        dismiss()
-                    }
-                    .disabled(chat.isGenerating)
-                }
-                Section {
-                    Toggle("Thinking mode", isOn: $chat.thinkingEnabled)
-                } footer: {
-                    Text("For models that support it (e.g. Qwen3): reason step by step before answering. Slower, but better on hard questions.")
-                }
-                Section("System prompt") {
-                    TextField("System prompt", text: $chat.systemPrompt, axis: .vertical)
-                        .lineLimit(2...6)
-                    Button("Apply (starts a new chat)") { chat.newSession() }
-                        .disabled(!chat.isLoaded)
-                }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+    @ViewBuilder
+    private var photoButton: some View {
+        let icon = Image(systemName: "photo")
+            .font(.title3)
+            .frame(width: 44, height: 44)
+        if chat.supportsImages {
+            PhotosPicker(selection: $photoItem, matching: .images) { icon }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: .circle)
+                .accessibilityLabel("Attach photo")
+        } else {
+            Button { showImageHint = true } label: { icon.foregroundStyle(.secondary) }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: .circle)
+                .accessibilityLabel("Attach photo")
         }
     }
 }
 
 // MARK: - Messages
 
+struct MessageList: View {
+    @Environment(ChatModel.self) private var chat
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach(chat.messages) { message in
+                        MessageBubble(message: message)
+                            .id(message.id)
+                    }
+                    StatusLine()
+                    Color.clear.frame(height: 1).id("bottom")
+                }
+                .padding()
+            }
+            .defaultScrollAnchor(.bottom)
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: chat.messages.last?.text) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
+        }
+    }
+}
+
+/// Speed, context size and free memory, so you can see when a chat is getting heavy.
+struct StatusLine: View {
+    @Environment(ChatModel.self) private var chat
+
+    var body: some View {
+        let parts = [
+            chat.stats.isEmpty ? nil : chat.stats,
+            chat.contextTokens > 0 ? "\(Self.compact(chat.contextTokens)) tokens in context" : nil,
+            chat.isLoaded
+                ? "\(chat.availableMemory.formatted(.byteCount(style: .memory))) free" : nil,
+        ].compactMap { $0 }
+        if !parts.isEmpty {
+            Text(parts.joined(separator: " · "))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+    }
+
+    static func compact(_ count: Int) -> String {
+        count < 1000 ? "\(count)" : String(format: "%.1fk", Double(count) / 1000)
+    }
+}
+
 struct MessageBubble: View {
+    @Environment(ChatModel.self) private var chat
     let message: ChatMessage
 
     var body: some View {
         switch message.role {
         case .user:
             VStack(alignment: .trailing, spacing: 6) {
-                if let image = message.image {
+                if let name = message.imageFile, let image = chat.store.image(named: name) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .frame(maxWidth: 200, maxHeight: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .frame(maxWidth: 220, maxHeight: 220)
+                        .clipShape(.rect(cornerRadius: 18))
                 }
                 Text(message.text)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
                     .foregroundStyle(.white)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular.tint(.brandPurple.opacity(0.85)), in: .rect(cornerRadius: 20))
+                    .contextMenu { copyButton(message.text) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.leading, 40)
+            .padding(.leading, 48)
+
         case .assistant:
             let parts = ReplyParts(message.text)
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 if let thinking = parts.thinking {
-                    DisclosureGroup(parts.isThinking ? "Thinking…" : "Thought process") {
+                    DisclosureGroup {
                         Text(thinking)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 6)
+                    } label: {
+                        Label(parts.isThinking ? "Thinking…" : "Thought process", systemImage: "brain")
+                            .font(.footnote.weight(.medium))
                     }
-                    .font(.footnote)
                     .tint(.secondary)
+                    .padding(12)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
                 }
                 if parts.answer.isEmpty && !parts.isThinking {
                     ProgressView()
                 } else if !parts.answer.isEmpty {
                     Text(LocalizedStringKey(parts.answer))
                         .textSelection(.enabled)
+                        .contextMenu { copyButton(parts.answer) }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+
+    private func copyButton(_ text: String) -> some View {
+        Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
+    }
 }
 
-/// Splits a reply into its `<think>` section (Qwen3, DeepSeek R1, …) and the visible answer.
-struct ReplyParts {
-    var thinking: String?
-    var answer: String
-    var isThinking = false
+// MARK: - Empty states
 
-    init(_ text: String) {
-        var text = text
-        if let open = text.range(of: "<think>") {
-            text.removeSubrange(text.startIndex..<open.upperBound)
-            if text.range(of: "</think>") == nil {
-                // Still inside the thinking block.
-                thinking = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                answer = ""
-                isThinking = true
-                return
+struct WelcomeView: View {
+    @Environment(ChatModel.self) private var chat
+    let openModels: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            BrandMark()
+            VStack(spacing: 6) {
+                Text("Pocket LAI").font(.largeTitle.bold())
+                Text("Private AI that runs entirely on your iPhone.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
+            if case .failed(let message) = chat.loadState {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .padding(12)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            }
+            GlassEffectContainer(spacing: 12) {
+                VStack(spacing: 12) {
+                    Button {
+                        Task { await chat.load(chat.selectedModel) }
+                    } label: {
+                        Label(
+                            chat.isDownloaded(chat.selectedModel)
+                                ? "Start with \(chat.selectedModel.name)"
+                                : "Download \(chat.selectedModel.name) · \(chat.selectedModel.size)",
+                            systemImage: "bolt.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.glassProminent)
+
+                    Button(action: openModels) {
+                        Label("Choose another model", systemImage: "square.stack.3d.up")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.glass)
+                }
+            }
+            .padding(.horizontal, 32)
+            Spacer()
+            Spacer()
         }
-        if let close = text.range(of: "</think>") {
-            let thought = text[..<close.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
-            thinking = thought.isEmpty ? nil : thought
-            answer = text[close.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-        } else {
-            answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        .padding()
+    }
+}
+
+struct EmptyChatView: View {
+    @Environment(ChatModel.self) private var chat
+    let suggest: (String) -> Void
+
+    private let suggestions = [
+        "Explain how a transformer model works, simply",
+        "Write a haiku about the ocean",
+        "Plan a relaxed 3-day trip to Lisbon",
+        "Give me 5 dinner ideas with chickpeas",
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            BrandMark()
+            Text(chat.supportsImages
+                 ? "Ask anything, or attach a photo."
+                 : "Ask anything. It all stays on your phone.")
+                .foregroundStyle(.secondary)
+            GlassEffectContainer(spacing: 10) {
+                VStack(spacing: 10) {
+                    ForEach(suggestions, id: \.self) { text in
+                        Button { suggest(text) } label: {
+                            Text(text)
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.glass)
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            Spacer()
         }
+    }
+}
+
+struct LoadingCard: View {
+    let modelName: String
+    let fraction: Double
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView(value: fraction)
+            HStack {
+                Text(fraction < 1 ? "Downloading \(modelName)…" : "Loading \(modelName)…")
+                Spacer()
+                Text(fraction, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+            }
+            .font(.subheadline)
+        }
+        .padding(20)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .padding(.horizontal, 32)
+        .frame(maxHeight: .infinity)
+    }
+}
+
+/// A glass disc with a sparkle, echoing the app icon.
+struct BrandMark: View {
+    var body: some View {
+        Image(systemName: "sparkles")
+            .font(.system(size: 40, weight: .semibold))
+            .foregroundStyle(
+                LinearGradient(colors: [.brandCyan, .brandPurple], startPoint: .topLeading, endPoint: .bottomTrailing)
+            )
+            .frame(width: 96, height: 96)
+            .glassEffect(.regular, in: .circle)
     }
 }

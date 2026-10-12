@@ -8,15 +8,7 @@ import MLXLMCommon
 import MLXVLM
 import Tokenizers
 import UIKit
-
-struct ChatMessage: Identifiable {
-    enum Role { case user, assistant }
-
-    let id = UUID()
-    let role: Role
-    var text: String
-    var image: UIImage?
-}
+import os
 
 @MainActor
 @Observable
@@ -28,79 +20,132 @@ final class ChatModel {
         case failed(String)
     }
 
+    // MARK: Models
+
     var selectedModel: LMModel = ModelCatalog.defaultModel
     var customModels: [LMModel] = []
     var loadState: LoadState = .idle
-    var messages: [ChatMessage] = []
-    var isGenerating = false
-    var stats = ""
-    var systemPrompt = "You are a helpful assistant running locally on an iPhone."
+    private(set) var loadedModel: LMModel?
     /// True when the loaded model accepts images (a vision-language model).
     private(set) var supportsImages = false
+    /// Bytes on disk per downloaded repo ID. Refreshed with ``refreshDownloads()``.
+    private(set) var downloadedSizes: [String: Int64] = [:]
 
-    /// Models that support it (e.g. Qwen3) "think" in <think>…</think> before answering.
-    var thinkingEnabled = false {
-        didSet { session?.additionalContext = ["enable_thinking": thinkingEnabled] }
+    // MARK: Chat
+
+    private(set) var conversation = Conversation()
+    private(set) var conversations: [Conversation] = []
+    var messages: [ChatMessage] { conversation.messages }
+    private(set) var isGenerating = false
+    private(set) var stats = ""
+    /// Tokens the model is currently holding as context for this chat.
+    private(set) var contextTokens = 0
+    /// Set when a message is refused because the phone is low on memory.
+    var memoryWarning: String?
+
+    // MARK: Settings (persisted)
+
+    var systemPrompt: String {
+        didSet {
+            defaults.set(systemPrompt, forKey: Keys.systemPrompt)
+            session = nil  // rebuilt with the new instructions on the next message
+        }
     }
 
+    /// Models that support it (e.g. Qwen3.5, DeepSeek R1) reason in <think>…</think> first.
+    var thinkingEnabled: Bool {
+        didSet {
+            defaults.set(thinkingEnabled, forKey: Keys.thinking)
+            session?.additionalContext = ["enable_thinking": thinkingEnabled]
+        }
+    }
+
+    let store = ConversationStore()
     private var container: ModelContainer?
     private var session: ChatSession?
-    private var loadedModel: LMModel?
+    /// Whether `session`'s transcript already contains a photo. See ``send(_:image:)``.
+    private var sessionHasImage = false
     private var generationTask: Task<Void, Never>?
+    private let defaults = UserDefaults.standard
 
-    private static let customModelsKey = "customModelRepoIDs"
+    private enum Keys {
+        static let customModels = "customModelRepoIDs"
+        static let systemPrompt = "systemPrompt"
+        static let thinking = "thinkingEnabled"
+    }
 
     init() {
         // Keep MLX's buffer cache small so memory is returned to the system between turns.
         Memory.cacheLimit = 32 * 1024 * 1024
-        let saved = UserDefaults.standard.stringArray(forKey: Self.customModelsKey) ?? []
-        customModels = saved.map(LMModel.init(customRepoID:))
+        systemPrompt = UserDefaults.standard.string(forKey: Keys.systemPrompt)
+            ?? "You are a helpful assistant running locally on an iPhone."
+        thinkingEnabled = UserDefaults.standard.bool(forKey: Keys.thinking)
+        customModels = (UserDefaults.standard.stringArray(forKey: Keys.customModels) ?? [])
+            .map(LMModel.init(customRepoID:))
+        conversations = store.loadAll()
+        refreshDownloads()
     }
 
-    var isLoaded: Bool { loadState == .ready && loadedModel == selectedModel }
+    var isLoaded: Bool { loadState == .ready && loadedModel != nil }
+
+    /// Memory the OS still lets this app allocate before it gets terminated.
+    var availableMemory: Int64 { Int64(os_proc_available_memory()) }
 
     // MARK: - Custom models
 
-    /// Adds any Hugging Face repo ID, e.g. "mlx-community/gemma-3-12b-it-qat-4bit".
+    /// Adds any Hugging Face repo ID, e.g. "mlx-community/Qwen3.5-0.8B-4bit".
     func addCustomModel(_ repoID: String) {
         let repoID = repoID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard repoID.contains("/"), !customModels.contains(where: { $0.repoID == repoID }) else {
             return
         }
-        let model = LMModel(customRepoID: repoID)
-        customModels.append(model)
-        selectedModel = model
+        customModels.append(LMModel(customRepoID: repoID))
         saveCustomModels()
     }
 
-    func removeCustomModels(at offsets: IndexSet) {
-        customModels.remove(atOffsets: offsets)
+    func removeCustomModel(_ model: LMModel) {
+        customModels.removeAll { $0 == model }
         saveCustomModels()
     }
 
     private func saveCustomModels() {
-        UserDefaults.standard.set(customModels.map(\.repoID), forKey: Self.customModelsKey)
+        defaults.set(customModels.map(\.repoID), forKey: Keys.customModels)
+    }
+
+    // MARK: - Downloads
+
+    func refreshDownloads() {
+        var sizes: [String: Int64] = [:]
+        for model in ModelCatalog.builtIn + customModels {
+            if let size = ModelStorage.downloadedSize(of: model.repoID) {
+                sizes[model.repoID] = size
+            }
+        }
+        downloadedSizes = sizes
+    }
+
+    func isDownloaded(_ model: LMModel) -> Bool { downloadedSizes[model.repoID] != nil }
+
+    /// Deletes a model's files, unloading it first if it's the one in memory.
+    func deleteDownload(of model: LMModel) {
+        if loadedModel == model { unload() }
+        try? ModelStorage.delete(model.repoID)
+        refreshDownloads()
     }
 
     // MARK: - Loading
 
-    /// Downloads the selected model (first time only) and loads it onto the GPU.
-    func load() async {
-        let model = selectedModel
+    /// Downloads `model` (first time only) and loads it onto the GPU.
+    /// The current chat is kept; the new model continues it.
+    func load(_ model: LMModel) async {
+        selectedModel = model
         if loadedModel == model, container != nil {
-            loadState = .ready  // already in memory (e.g. user reopened the picker)
+            loadState = .ready
             return
         }
 
-        stop()
         // Release the previous model before loading the next, so two never sit in memory.
-        container = nil
-        session = nil
-        loadedModel = nil
-        supportsImages = false
-        messages = []
-        stats = ""
-        Memory.clearCache()
+        unload()
         loadState = .loading(0)
 
         do {
@@ -126,61 +171,128 @@ final class ChatModel {
             self.container = container
             self.loadedModel = model
             self.supportsImages = await container.perform { $0.model is any VLMModel }
-            newSession()
             loadState = .ready
         } catch {
             loadState = .failed(error.localizedDescription)
         }
+        refreshDownloads()
+    }
+
+    func unload() {
+        stop()
+        session = nil
+        sessionHasImage = false
+        container = nil
+        loadedModel = nil
+        supportsImages = false
+        contextTokens = 0
+        loadState = .idle
+        Memory.clearCache()
+    }
+
+    // MARK: - Conversations
+
+    func newChat() {
+        stop()
+        conversation = Conversation()
+        resetSession()
+    }
+
+    func open(_ saved: Conversation) {
+        stop()
+        conversation = saved
+        resetSession()
+    }
+
+    func delete(_ saved: Conversation) {
+        store.delete(saved)
+        conversations.removeAll { $0.id == saved.id }
+        if conversation.id == saved.id {
+            stop()
+            conversation = Conversation()
+            resetSession()
+        }
+    }
+
+    func deleteAllChats() {
+        stop()
+        for saved in conversations { store.delete(saved) }
+        conversations = []
+        conversation = Conversation()
+        resetSession()
+    }
+
+    /// Drops the model's context. The next message rebuilds it from the chat's text.
+    private func resetSession() {
+        session = nil
+        sessionHasImage = false
+        contextTokens = 0
+        stats = ""
+        Memory.clearCache()
+    }
+
+    private func persist() {
+        guard !conversation.messages.isEmpty else { return }
+        conversation.updatedAt = Date()
+        store.save(conversation)
+        conversations.removeAll { $0.id == conversation.id }
+        conversations.insert(conversation, at: 0)
     }
 
     // MARK: - Chat
 
-    /// Starts a fresh conversation with the loaded model.
-    func newSession() {
-        stop()
-        messages = []
-        stats = ""
-        guard let container else { return }
-
-        var parameters = GenerateParameters()
-        parameters.temperature = 0.7
-        parameters.topP = 0.9
-        parameters.maxTokens = 2048
-
-        session = ChatSession(
-            container,
-            instructions: systemPrompt,
-            generateParameters: parameters,
-            additionalContext: ["enable_thinking": thinkingEnabled]
-        )
-    }
-
     func send(_ text: String, image: UIImage? = nil) {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let session, !prompt.isEmpty, !isGenerating else { return }
+        guard let container, !prompt.isEmpty, !isGenerating else { return }
+        let image = supportsImages ? image : nil
 
-        var images: [UserInput.Image] = []
-        if supportsImages, let cgImage = image?.cgImage {
-            images.append(.ciImage(CIImage(cgImage: cgImage)))
+        // Refuse instead of letting iOS kill the app when memory is nearly exhausted.
+        Memory.clearCache()
+        let needed: Int64 = image == nil ? 400_000_000 : 900_000_000
+        guard availableMemory > needed else {
+            memoryWarning =
+                "Only \(availableMemory.formatted(.byteCount(style: .memory))) of memory is left. "
+                + "Start a new chat to free the model's context, or switch to a smaller model."
+            return
         }
 
-        messages.append(ChatMessage(role: .user, text: prompt, image: images.isEmpty ? nil : image))
-        messages.append(ChatMessage(role: .assistant, text: ""))
-        let replyID = messages[messages.count - 1].id
+        // Vision models like Gemma 4 can't append a new photo to their cached context:
+        // the library re-encodes *every* photo in the transcript on each new photo, which
+        // runs the phone out of memory after a few. So before sending another photo,
+        // rebuild the context from the chat's text only. Earlier photos stay visible in
+        // the chat, and the model still has its own earlier descriptions of them.
+        if image != nil, sessionHasImage { resetSession() }
+        let activeSession = session ?? makeSession(container)
+
+        var images: [UserInput.Image] = []
+        var imageFile: String?
+        if let image, let cgImage = image.downscaled(maxDimension: 1024).cgImage {
+            images.append(.ciImage(CIImage(cgImage: cgImage)))
+            imageFile = store.saveImage(image)
+            sessionHasImage = true
+        }
+
+        if conversation.messages.isEmpty {
+            conversation.title = String(prompt.prefix(60))
+        }
+        conversation.modelName = loadedModel?.name
+        conversation.messages.append(ChatMessage(role: .user, text: prompt, imageFile: imageFile))
+        conversation.messages.append(ChatMessage(role: .assistant, text: ""))
+        let replyID = conversation.messages[conversation.messages.count - 1].id
         isGenerating = true
         stats = ""
+        persist()
 
         generationTask = Task {
             do {
-                for try await item in session.streamDetails(to: prompt, images: images) {
+                for try await item in activeSession.streamDetails(to: prompt, images: images) {
                     switch item {
                     case .chunk(let chunk):
                         append(chunk, to: replyID)
                     case .info(let info):
+                        contextTokens = info.promptTokenCount + info.generationTokenCount
                         let tps = Double(info.generationTokenCount) / max(info.generateTime, 0.001)
-                        stats = String(
-                            format: "%d tokens · %.1f tok/s · prompt %.2fs",
-                            info.generationTokenCount, tps, info.promptTime)
+                        stats = String(format: "%.1f tok/s", tps)
                     default:
                         break
                     }
@@ -190,19 +302,79 @@ final class ChatModel {
             } catch {
                 append("\n\n⚠️ \(error.localizedDescription)", to: replyID)
             }
-            // stop() already reset state for a cancelled run; don't clobber a newer one.
-            if !Task.isCancelled { isGenerating = false }
+            // stop() already saved and reset state for a cancelled run; don't clobber a newer one.
+            if !Task.isCancelled {
+                isGenerating = false
+                generationTask = nil
+                persist()
+            }
         }
     }
 
     func stop() {
-        generationTask?.cancel()
-        generationTask = nil
+        guard let generationTask else { return }
+        generationTask.cancel()
+        self.generationTask = nil
         isGenerating = false
+        persist()  // keep the partial reply
+    }
+
+    /// Creates the model session, restoring this chat's earlier turns as context
+    /// (text only: thinking sections and photos are left out to save memory).
+    private func makeSession(_ container: ModelContainer) -> ChatSession {
+        var parameters = GenerateParameters()
+        parameters.temperature = 0.7
+        parameters.topP = 0.9
+        parameters.maxTokens = 2048
+
+        let history: [Chat.Message] = conversation.messages.compactMap { message in
+            let text = message.role == .assistant ? ReplyParts(message.text).answer : message.text
+            guard !text.isEmpty else { return nil }
+            return Chat.Message(role: message.role == .user ? .user : .assistant, content: text)
+        }
+
+        let newSession = ChatSession(
+            container,
+            instructions: systemPrompt,
+            history: history,
+            generateParameters: parameters,
+            additionalContext: ["enable_thinking": thinkingEnabled]
+        )
+        session = newSession
+        sessionHasImage = false
+        return newSession
     }
 
     private func append(_ chunk: String, to id: UUID) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].text += chunk
+        guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else { return }
+        conversation.messages[index].text += chunk
+    }
+}
+
+/// Splits a reply into its `<think>` section (Qwen3.5, DeepSeek R1, …) and the visible answer.
+struct ReplyParts {
+    var thinking: String?
+    var answer: String
+    var isThinking = false
+
+    init(_ text: String) {
+        var text = text
+        if let open = text.range(of: "<think>") {
+            text.removeSubrange(text.startIndex..<open.upperBound)
+            if text.range(of: "</think>") == nil {
+                // Still inside the thinking block.
+                thinking = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                answer = ""
+                isThinking = true
+                return
+            }
+        }
+        if let close = text.range(of: "</think>") {
+            let thought = text[..<close.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+            thinking = thought.isEmpty ? nil : thought
+            answer = text[close.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 }
