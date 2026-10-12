@@ -24,7 +24,6 @@ struct ChatView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 bottomBar
             }
-            .background { AppBackground() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(item: $sheet) { sheet in
@@ -82,9 +81,7 @@ struct ChatView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 6)
             }
-            .buttonStyle(.glass)
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button("New chat", systemImage: "square.and.pencil") { chat.newChat() }
@@ -136,10 +133,11 @@ struct ChatView: View {
             } label: {
                 Label("Load \(chat.selectedModel.name) to continue", systemImage: "bolt.fill")
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .padding()
+            .background(.bar)
         }
     }
 
@@ -148,85 +146,69 @@ struct ChatView: View {
     }
 
     private var inputBar: some View {
-        GlassEffectContainer(spacing: 10) {
-            VStack(alignment: .leading, spacing: 8) {
-                if let attachedImage {
-                    ZStack(alignment: .topTrailing) {
-                        Image(uiImage: attachedImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 72, height: 72)
-                            .clipShape(.rect(cornerRadius: 14))
-                        Button("Remove", systemImage: "xmark") { self.attachedImage = nil }
-                            .labelStyle(.iconOnly)
-                            .font(.caption.weight(.bold))
-                            .frame(width: 24, height: 24)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                            .offset(x: 8, y: -8)
-                    }
-                    .padding(.leading, 54)
+        VStack(alignment: .leading, spacing: 8) {
+            if let attachedImage {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: attachedImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 64, height: 64)
+                        .clipShape(.rect(cornerRadius: 10))
+                    Button("Remove", systemImage: "xmark.circle.fill") { self.attachedImage = nil }
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.white, .black.opacity(0.6))
+                        .offset(x: 6, y: -6)
                 }
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                photoButton
 
-                HStack(alignment: .bottom, spacing: 10) {
-                    photoButton
+                TextField("Ask anything", text: $input, axis: .vertical)
+                    .lineLimit(1...5)
+                    .focused($inputFocused)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
 
-                    TextField("Ask anything", text: $input, axis: .vertical)
-                        .lineLimit(1...6)
-                        .focused($inputFocused)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 22))
-
-                    if chat.isGenerating {
-                        Button { chat.stop() } label: {
-                            Image(systemName: "stop.fill")
-                                .font(.headline)
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive(), in: .circle)
-                        .accessibilityLabel("Stop")
-                    } else {
-                        Button {
-                            chat.send(input, image: attachedImage)
-                            input = ""
-                            attachedImage = nil
-                            inputFocused = false
-                        } label: {
-                            Image(systemName: "arrow.up")
-                                .font(.headline.weight(.bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.tint(.brandPurple).interactive(), in: .circle)
-                        .disabled(!canSend)
-                        .opacity(canSend ? 1 : 0.5)
-                        .accessibilityLabel("Send")
+                if chat.isGenerating {
+                    Button("Stop", systemImage: "stop.circle.fill") { chat.stop() }
+                        .labelStyle(.iconOnly)
+                        .font(.title)
+                } else {
+                    Button("Send", systemImage: "arrow.up.circle.fill") {
+                        chat.send(input, image: attachedImage)
+                        input = ""
+                        attachedImage = nil
+                        inputFocused = false
                     }
+                    .labelStyle(.iconOnly)
+                    .font(.title)
+                    .disabled(!canSend)
                 }
             }
         }
         .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     @ViewBuilder
     private var photoButton: some View {
-        let icon = Image(systemName: "photo")
-            .font(.title3)
-            .frame(width: 44, height: 44)
-        if chat.supportsImages {
-            PhotosPicker(selection: $photoItem, matching: .images) { icon }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .accessibilityLabel("Attach photo")
-        } else {
-            Button { showImageHint = true } label: { icon.foregroundStyle(.secondary) }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .accessibilityLabel("Attach photo")
+        Group {
+            if chat.supportsImages {
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    Image(systemName: "photo.badge.plus")
+                }
+            } else {
+                // Text-only model: explain instead of silently hiding the button.
+                Button("Attach photo", systemImage: "photo.badge.plus") { showImageHint = true }
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .font(.title2)
+        .padding(.bottom, 4)
+        .accessibilityLabel("Attach photo")
     }
 }
 
@@ -300,7 +282,7 @@ struct MessageBubble: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .glassEffect(.regular.tint(.brandPurple.opacity(0.85)), in: .rect(cornerRadius: 20))
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18))
                     .contextMenu { copyButton(message.text) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -321,8 +303,6 @@ struct MessageBubble: View {
                             .font(.footnote.weight(.medium))
                     }
                     .tint(.secondary)
-                    .padding(12)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
                 }
                 if parts.answer.isEmpty && !parts.isThinking {
                     ProgressView()
@@ -363,7 +343,9 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            BrandMark()
+            Image(systemName: "sparkles")
+                .font(.system(size: 48))
+                .foregroundStyle(.tint)
             VStack(spacing: 6) {
                 Text("Pocket LAI").font(.largeTitle.bold())
                 Text("Private AI that runs entirely on your iPhone.")
@@ -374,33 +356,28 @@ struct WelcomeView: View {
                 Label(message, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(.red)
-                    .padding(12)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
             }
-            GlassEffectContainer(spacing: 12) {
-                VStack(spacing: 12) {
-                    Button {
-                        Task { await chat.load(chat.selectedModel) }
-                    } label: {
-                        Label(
-                            chat.isDownloaded(chat.selectedModel)
-                                ? "Start with \(chat.selectedModel.name)"
-                                : "Download \(chat.selectedModel.name) · \(chat.selectedModel.size)",
-                            systemImage: "bolt.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.glassProminent)
-
-                    Button(action: openModels) {
-                        Label("Choose another model", systemImage: "square.stack.3d.up")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.glass)
+            VStack(spacing: 12) {
+                Button {
+                    Task { await chat.load(chat.selectedModel) }
+                } label: {
+                    Label(
+                        chat.isDownloaded(chat.selectedModel)
+                            ? "Start with \(chat.selectedModel.name)"
+                            : "Download \(chat.selectedModel.name) · \(chat.selectedModel.size)",
+                        systemImage: "bolt.fill"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+
+                Button(action: openModels) {
+                    Label("Choose another model", systemImage: "square.stack.3d.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
+            .controlSize(.large)
             .padding(.horizontal, 32)
             Spacer()
             Spacer()
@@ -421,24 +398,23 @@ struct EmptyChatView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             Spacer()
-            BrandMark()
+            Image(systemName: "sparkles")
+                .font(.system(size: 40))
+                .foregroundStyle(.tint)
             Text(chat.supportsImages
                  ? "Ask anything, or attach a photo."
                  : "Ask anything. It all stays on your phone.")
                 .foregroundStyle(.secondary)
-            GlassEffectContainer(spacing: 10) {
-                VStack(spacing: 10) {
-                    ForEach(suggestions, id: \.self) { text in
-                        Button { suggest(text) } label: {
-                            Text(text)
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.glass)
+            VStack(spacing: 8) {
+                ForEach(suggestions, id: \.self) { text in
+                    Button { suggest(text) } label: {
+                        Text(text)
+                            .font(.subheadline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .buttonStyle(.bordered)
                 }
             }
             .padding(.horizontal, 24)
@@ -452,37 +428,19 @@ struct LoadingCard: View {
     let fraction: Double
 
     var body: some View {
-        VStack(spacing: 14) {
-            ProgressView(value: fraction)
-            HStack {
+        VStack(spacing: 12) {
+            ProgressView(value: fraction) {
                 Text(fraction < 1 ? "Downloading \(modelName)…" : "Loading \(modelName)…")
-                Spacer()
+            } currentValueLabel: {
                 Text(fraction, format: .percent.precision(.fractionLength(0)))
-                    .monospacedDigit()
             }
-            .font(.subheadline)
             if fraction < 1 {
                 Label("You can lock your phone or leave the app. The download continues, and you'll get a notification when it's done.", systemImage: "moon.zzz")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(20)
-        .glassEffect(.regular, in: .rect(cornerRadius: 24))
         .padding(.horizontal, 32)
         .frame(maxHeight: .infinity)
-    }
-}
-
-/// A glass disc with a sparkle, echoing the app icon.
-struct BrandMark: View {
-    var body: some View {
-        Image(systemName: "sparkles")
-            .font(.system(size: 40, weight: .semibold))
-            .foregroundStyle(
-                LinearGradient(colors: [.brandCyan, .brandPurple], startPoint: .topLeading, endPoint: .bottomTrailing)
-            )
-            .frame(width: 96, height: 96)
-            .glassEffect(.regular, in: .circle)
     }
 }

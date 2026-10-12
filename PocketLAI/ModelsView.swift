@@ -33,7 +33,7 @@ struct ModelsView: View {
                             .submitLabel(.done)
                             .onSubmit { addCustomModel() }
                         Button("Add") { addCustomModel() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.bordered)
                         .disabled(!customRepoID.contains("/"))
                     }
                 } header: {
@@ -121,10 +121,7 @@ struct ModelsView: View {
         if chat.loadedModel == model {
             Label("Loaded", systemImage: "bolt.fill")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .glassEffect(.regular.tint(.brandPurple), in: .capsule)
+                .foregroundStyle(.tint)
         } else if case .loading = chat.loadState, chat.selectedModel == model {
             ProgressView()
         } else if let size = chat.downloadedSizes[model.repoID] {
